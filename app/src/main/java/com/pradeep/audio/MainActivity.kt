@@ -58,6 +58,10 @@ class MainActivity : AppCompatActivity() {
             stopRecord()
         }
 
+        resumeRecord.setOnClickListener {
+            resumeRecord()
+        }
+
         cancelRecord.setOnClickListener {
             cancelRecord()
         }
@@ -70,10 +74,15 @@ class MainActivity : AppCompatActivity() {
     private fun stopRecord() {
         timer.cancel()
         mr.pause()
-        startRecord.visibility = View.VISIBLE
         stopRecord.visibility = View.GONE
-        cancelRecord.visibility = View.GONE
-        saveRecord.visibility = View.GONE
+        resumeRecord.visibility = View.VISIBLE
+    }
+
+    private fun resumeRecord() {
+        timer.start()
+        mr.resume()
+        stopRecord.visibility = View.VISIBLE
+        resumeRecord.visibility = View.GONE
     }
 
     private fun saveRecord() {
@@ -83,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         stopRecord.visibility = View.GONE
         cancelRecord.visibility = View.GONE
         saveRecord.visibility = View.GONE
+        resumeRecord.visibility = View.GONE
         timer_id.text = "00:00"
     }
 
@@ -93,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         stopRecord.visibility = View.GONE
         cancelRecord.visibility = View.GONE
         saveRecord.visibility = View.GONE
+        resumeRecord.visibility = View.GONE
         timer_id.text = "00:00"
     }
 

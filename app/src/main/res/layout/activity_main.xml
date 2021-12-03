@@ -71,6 +71,18 @@
                 app:tint="#add8e6" />
 
             <ImageView
+                android:id="@+id/resumeRecord"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:padding="25dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone"
+                android:src="@drawable/play_button"
+                android:background="@drawable/circle"
+                app:tint="#add8e6" />
+
+            <ImageView
                 android:id="@+id/stopRecord"
                 android:layout_width="80dp"
                 android:layout_height="80dp"
