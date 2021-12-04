@@ -1,9 +1,11 @@
 package com.pradeep.audio
 
 import android.Manifest
+import android.app.RecoverableSecurityException
 import android.content.ContentValues
 import android.content.Intent
-import android.media.MediaPlayer
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
@@ -14,8 +16,16 @@ import android.provider.MediaStore
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 class MainActivity : AppCompatActivity() {
@@ -26,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private var file: ParcelFileDescriptor? = null
     private var recordingStarted = false
     private var count: Long = 0
+    private lateinit var intentSenderLauncher: ActivityResultLauncher<IntentSenderRequest>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +47,14 @@ class MainActivity : AppCompatActivity() {
         Util.requestPermission(this, Manifest.permission.RECORD_AUDIO)
         Util.requestPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
         Util.requestPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+        intentSenderLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()){
+            if (it.resultCode == RESULT_OK){
+                Toast.makeText(this@MainActivity, "Audio deleted", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Audio deletion failed", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         timer = object : CountDownTimer(Long.MAX_VALUE, 1000) {
             override fun onTick(millisUntilFinished: Long) {
@@ -86,6 +105,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveRecord() {
+        val saveAudioDialog = SaveAudioDialog(this@MainActivity, audioURI, file)
+        saveAudioDialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        saveAudioDialog.show()
         timer.cancel()
         mr.stop()
         startRecord.visibility = View.VISIBLE
@@ -94,17 +116,46 @@ class MainActivity : AppCompatActivity() {
         saveRecord.visibility = View.GONE
         resumeRecord.visibility = View.GONE
         timer_id.text = "00:00"
+        recordingStarted = false
     }
 
     private fun cancelRecord(){
         timer.cancel()
         mr.stop()
+        CoroutineScope(Dispatchers.IO).launch {
+            deleteAudio()
+        }
         startRecord.visibility = View.VISIBLE
         stopRecord.visibility = View.GONE
         cancelRecord.visibility = View.GONE
         saveRecord.visibility = View.GONE
         resumeRecord.visibility = View.GONE
         timer_id.text = "00:00"
+        recordingStarted = false
+    }
+
+    private suspend fun deleteAudio(){
+        withContext(Dispatchers.IO){
+            try {
+                audioURI?.let { contentResolver.delete(it, null, null) }
+            } catch (e: SecurityException){
+                val intentSender = when {
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                        MediaStore.createDeleteRequest(contentResolver, listOf(audioURI)).intentSender
+                    }
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                        val recoverableSecurityException = e as? RecoverableSecurityException
+                        recoverableSecurityException?.userAction?.actionIntent?.intentSender
+                    }
+                    else -> null
+                }
+                intentSender?.let { sender ->
+                    intentSenderLauncher.launch(
+                            IntentSenderRequest.Builder(sender).build()
+                    )
+                }
+            }
+        }
     }
 
     private fun startRecording() {
@@ -117,6 +168,7 @@ class MainActivity : AppCompatActivity() {
                 cancelRecord.visibility = View.VISIBLE
                 saveRecord.visibility = View.VISIBLE
             } else {
+                count = 0
                 timer.start()
                 val values = ContentValues(4)
                 values.put(MediaStore.Audio.Media.TITLE, "record")
